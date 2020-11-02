@@ -70,6 +70,7 @@ class Tag(models.Model):
     name = models.CharField(max_length=256)
     color = models.CharField(max_length=16)
     keywords = models.CharField(max_length=256, null=True, blank=True, help_text=_("Comma-separated list of words. If found in a conversation, this tag will be applied."))
+    last_changed = models.DateTimeField(auto_now_add=True, null=True, blank=True)
 
     def __str__(self):
         return "%s (%s)" % (self.name, self.community)
@@ -253,6 +254,7 @@ class Source(models.Model):
     auth_id = models.CharField(max_length=256, null=True, blank=True)
     auth_secret = models.CharField(max_length=256, null=True, blank=True)
     icon_name = models.CharField(max_length=256, null=True, blank=True)
+    first_import = models.DateTimeField(null=True, blank=True)
     last_import = models.DateTimeField(null=True, blank=True)
     enabled = models.BooleanField(default=True)
 
@@ -281,6 +283,7 @@ class Channel(ImportedDataModel):
     source = models.ForeignKey(Source, on_delete=models.CASCADE)
     name = models.CharField(max_length=256)
     tag = models.ForeignKey(Tag, on_delete=models.SET_NULL, null=True, blank=True)
+    first_import = models.DateTimeField(null=True, blank=True)
     last_import = models.DateTimeField(null=True, blank=True)
 
     @property
@@ -402,6 +405,16 @@ class Task(TaggableModel):
     def __str__(self):
         return self.name
 
+    @property
+    def owner_name(self):
+        try:
+            manager = ManagerProfile.objects.get(community=self.community, user=self.owner)
+            return str(manager)
+        except ManagerProfile.DoesNotExist:
+            if self.owner.first_name:
+                return self.owner.get_full_name()
+            return self.owner.username
+
 class ContributionType(models.Model):
     class Meta:
         verbose_name = _("Contribution Type")
@@ -412,10 +425,7 @@ class ContributionType(models.Model):
     feed = models.URLField(null=True, blank=True)
 
     def __str__(self):
-        if self.source is not None:
-            return "%s %s (%s)" % (self.source.connector_name, self.name, self.community)
-        else:
-            return "%s (%s)" % (self.name, self.community)
+        return self.name
 
 class Contribution(TaggableModel, ImportedDataModel):
     class Meta:
@@ -423,7 +433,7 @@ class Contribution(TaggableModel, ImportedDataModel):
         ordering = ('-timestamp',)
     community = models.ForeignKey(Community, on_delete=models.CASCADE)
     contribution_type = models.ForeignKey(ContributionType, on_delete=models.CASCADE)
-    channel = models.ForeignKey(Channel, on_delete=models.SET_NULL, null=True, blank=True)
+    channel = models.ForeignKey(Channel, on_delete=models.CASCADE, null=True, blank=True)
     title = models.CharField(max_length=256)
     timestamp = models.DateTimeField(db_index=True)
     author = models.ForeignKey(Member, on_delete=models.SET_NULL, null=True)
@@ -484,6 +494,16 @@ class Note(TaggableModel):
                 return self.content[:min(len(self.content), 32)]
         else:
             return str(self.timestamp)
+
+    @property
+    def author_name(self):
+        try:
+            manager = ManagerProfile.objects.get(community=self.member.community, user=self.author)
+            return str(manager)
+        except ManagerProfile.DoesNotExist:
+            if self.author.first_name:
+                return self.author.get_full_name()
+            return self.author.username
 
 class Suggestion(models.Model):
     class Meta:
@@ -626,7 +646,10 @@ class ManagerProfile(models.Model):
         try:
             if self.realname:
                 return self.realname
-            return "%s" % self.user.username
+            elif self.user.first_name:
+                return self.user.get_full_name()
+            else:
+                return self.user.username
         except:
             return _("Unknown Profile")
 

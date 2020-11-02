@@ -7,7 +7,7 @@
           <!-- Page Heading -->
           <div class="d-sm-flex align-items-center justify-content-between mb-4">
             <h1 class="h3 mb-0 text-gray-800">{{view.project.name}} Project</h1>
-            {% include 'savannahv2/filter_button.html' with current_tag=view.tag%}
+            {% include 'savannahv2/filter_button.html' with current_tag=view.tag members_only=True %}
           </div>
 
           <!-- Content Row -->
@@ -106,7 +106,7 @@
                 <tbody>
                 {% for task in view.open_tasks %}
                 <tr>
-                  <td class="text-nowrap">{{task.owner}}</td>
+                  <td class="text-nowrap">{{task.owner_name}}</td>
                   <td><a href="{% url 'project_task_edit' community_id=view.community.id project_id=view.project.id task_id=task.id %}" title="{{task.detail}}">{{task.name}}</a></td>
                   <td>{{task.due}}</td>
                   <td>

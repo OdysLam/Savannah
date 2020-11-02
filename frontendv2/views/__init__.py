@@ -94,7 +94,10 @@ class SavannahView:
     def __init__(self, request, community_id):
         request.session['community'] = community_id
         self.request = request
-        self.community = get_object_or_404(Community, Q(owner=self.request.user) | Q(managers__in=self.request.user.groups.all()), id=community_id)
+        if request.user.is_superuser:
+            self.community = get_object_or_404(Community, id=community_id)
+        else:
+            self.community = get_object_or_404(Community, Q(owner=self.request.user) | Q(managers__in=self.request.user.groups.all()), id=community_id)
         if request.user.is_authenticated:
             self.manager_profile, created = ManagerProfile.objects.update_or_create(user=request.user, community=self.community, defaults={'last_seen': datetime.datetime.utcnow()})
             self.user_member = self.manager_profile.member
@@ -142,6 +145,20 @@ class SavannahFilterView(SavannahView):
         except:
             self.tag = None
             request.session['tag'] = None
+
+        self.member_tag = None
+        try:
+            if 'member_tag' in request.GET:
+                if request.GET.get('member_tag') == '':
+                    equest.session['member_tag'] = None
+                else:
+                    self.member_tag = Tag.objects.get(community=self.community, name=request.GET.get('member_tag'))
+                    request.session['member_tag'] = request.GET.get('member_tag')
+            elif 'member_tag' in request.session:
+                self.member_tag = Tag.objects.get(community=self.community, name=request.session.get('member_tag'))
+        except:
+            self.member_tag = None
+            request.session['member_tag'] = None
 
         self.role = None
         try:
@@ -225,14 +242,12 @@ class SavannahFilterView(SavannahView):
 
     @property
     def timespan_icon(self):
-        if self.timespan == 183:
-            return "fas fa-calendar"
-        elif self.timespan == 30:
-            return "fas fa-calendar-alt"
-        elif self.timespan == 7:
-            return "fas fa-calendar-week"
-        elif self.timespan == 1:
+        if self.timespan == 1:
             return "fas fa-calendar-day"
+        elif self.timespan <= 7:
+            return "fas fa-calendar-week"
+        elif self.timespan <= 90:
+            return "fas fa-calendar-alt"
         else:
             return "fas fa-calendar"
 
